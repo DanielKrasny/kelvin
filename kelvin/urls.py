@@ -22,7 +22,8 @@ from web.views.common import render_custom_error_page
 
 from common.utils import is_teacher
 from ninja import NinjaAPI
-from api.v2.default import router as api_router
+from api.v2.default import router as api_default_router
+from api.v2.api import router as api_router
 from api.v2.llm import router as llm_router
 from api.v2.task import router as task_router
 
@@ -32,7 +33,8 @@ api_v2 = NinjaAPI(
     docs_decorator=user_passes_test(is_teacher),
     urls_namespace="v2",
 )
-api_v2.add_router("", api_router)
+api_v2.add_router("", api_default_router)
+api_v2.add_router("api", api_router)
 api_v2.add_router("llm", llm_router)
 api_v2.add_router("task", task_router)
 
