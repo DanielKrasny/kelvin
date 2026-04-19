@@ -11,3 +11,7 @@ class SemesterResponse(Schema):
 
 class HealthCheckResponse(Schema):
     status: str = Field(..., description="Health status of Kelvin")
+
+
+class ErrorResponse(Schema):
+    detail: str = Field(..., description="Error message")
