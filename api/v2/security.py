@@ -23,6 +23,8 @@ class UserPassesTestAuth(SessionAuth):
                 function is only invoked if the user is logged in.
         """
         super().__init__()
+        # Shadow class name for OpenAPI schema
+        self.__class__.__name__ = SessionAuth.__name__
         self.test_func = test_func
 
     def authenticate(self, request: HttpRequest, key: Optional[str]) -> Optional[Any]:
