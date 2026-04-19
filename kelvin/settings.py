@@ -294,6 +294,9 @@ OPENAI_MODEL = os.getenv("OPENAI__MODEL", "openai/gpt-oss-120b")
 INBUS_CLIENT_ID = "placeholder"
 INBUS_CLIENT_SECRET = "placeholder"
 
+# The default Client ID for new tokens generated from web UI.
+API_TOKENS_DEFAULT_CLIENT_ID = ""
+
 try:
     from .local_settings import *  # noqa: F403
 except ModuleNotFoundError:
