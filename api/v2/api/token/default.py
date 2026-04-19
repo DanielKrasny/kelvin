@@ -57,6 +57,8 @@ def get_api_token(request, token_id: int) -> UserTokenDTO:
     auth=django_auth,
 )
 def create_api_token(request, body: CreateUserTokenSchema) -> CreateUserTokenDTO:
+    if hasattr(request.user, "current_token") and request.user.current_token:
+        raise AuthorizationError(message="API tokens can be created only in the Web UI.")
     token_plaintext = get_random_string(32)
     token_secure = hash_token(token_plaintext)
 
