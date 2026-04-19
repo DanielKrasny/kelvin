@@ -7,6 +7,7 @@ from django.http import HttpResponseRedirect, Http404
 from django.utils.crypto import get_random_string
 from ninja import Router
 from ninja.errors import AuthorizationError, HttpError
+from ninja.pagination import paginate
 from ninja.security import django_auth
 from kelvin.settings import API_TOKENS_DEFAULT_CLIENT_ID
 from web.views.common import UnsafeHttpResponseRedirect
@@ -27,6 +28,7 @@ router = Router()
     url_name="list_api_token",
     auth=django_auth,
 )
+@paginate
 def list_api_token(request) -> List[UserTokenDTO]:
     tokens = request.user.usertoken_set.all()
     return [token.to_dto() for token in tokens]
@@ -50,7 +52,7 @@ def get_api_token(request, token_id: int) -> UserTokenDTO:
 
 @router.post(
     "/",
-    response={200: UserTokenDTO, 302: None, 401: ErrorResponse, 403: ErrorResponse},
+    response={200: CreateUserTokenDTO, 302: None, 401: ErrorResponse, 403: ErrorResponse},
     summary="Create a new API token for the logged in user",
     description="The endpoint performs a redirect in case client ID has a redirect URI set.",
     url_name="create_api_token",
@@ -90,15 +92,16 @@ def create_api_token(request, body: CreateUserTokenSchema) -> CreateUserTokenDTO
 
 @router.delete(
     "/{token_id}",
-    response={200: None, 401: ErrorResponse, 404: ErrorResponse},
+    response={200: bool, 401: ErrorResponse, 404: ErrorResponse},
     summary="Delete a specific API token for the logged in user",
     url_name="delete_api_token",
     auth=django_auth,
 )
-def delete_api_token(request, token_id: int):
+def delete_api_token(request, token_id: int) -> bool:
     token = request.user.usertoken_set.filter(id=token_id).first()
     if not token:
         raise HttpError(
             404, f"API token with ID '{token_id}' does not exist for the logged in user."
         )
     token.delete()
+    return True
