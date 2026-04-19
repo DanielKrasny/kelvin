@@ -163,6 +163,8 @@ import MarkButton from './components/MarkButton.vue';
 import TaskDetail from './Student/TaskDetail.vue';
 import SyncLoader from './components/SyncLoader.vue';
 import EditTask from './Teacher/EditTask/EditTask.vue';
+import ApiTokenList from './Api/ApiTokenList.vue';
+import ApiUsage from './Api/ApiUsage.vue';
 
 const router = createRouter({
     history: createWebHistory(),
@@ -234,6 +236,8 @@ registerVueComponent('quiz', Quiz);
 registerVueComponent('quiz-edit', QuizEdit);
 registerSuspendedVueComponent('quiz-list', QuizList);
 registerSuspendedVueComponent('quiz-submit-list', QuizSubmitList);
+registerVueComponent('api-token-list', ApiTokenList);
+registerVueComponent('api-usage', ApiUsage);
 if (enableNewUI) registerVueComponent('color-theme', ColorThemeNew);
 
 // TODO: Remove when all Svelte is converted. This will then not needed as custom components.
