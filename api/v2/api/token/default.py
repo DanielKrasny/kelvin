@@ -10,12 +10,21 @@ from ninja.errors import AuthorizationError, HttpError
 from ninja.pagination import paginate
 from ninja.security import django_auth
 from kelvin.settings import API_TOKENS_DEFAULT_CLIENT_ID
-from web.views.common import UnsafeHttpResponseRedirect
 from api.backends import hash_token
 from api.models import ApiClient, UserToken
 from api.v2.dto import ErrorResponse
 from .dto import UserTokenDTO, CreateUserTokenDTO
 from .schema import CreateUserTokenSchema
+
+
+class UnsafeHttpResponseRedirect(HttpResponseRedirect):
+    """
+    An HTTP response that redirects to a given URL without validating the URL's scheme.
+    """
+
+    def __init__(self, redirect_to, *args, **kwargs):
+        self.allowed_schemes = [urlparse(str(redirect_to)).scheme]
+        super().__init__(redirect_to, *args, **kwargs)
 
 
 router = Router()
