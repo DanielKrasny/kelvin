@@ -42,11 +42,21 @@ withDefaults(
         </div>
 
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" @click="onClosed(false)">
+          <button
+            v-if="cancelButtonLabel !== ''"
+            type="button"
+            class="btn btn-secondary"
+            @click="onClosed(false)"
+          >
             {{ cancelButtonLabel }}
           </button>
 
-          <button type="button" class="btn btn-primary" @click="onClosed(true)">
+          <button
+            v-if="proceedButtonLabel !== ''"
+            type="button"
+            class="btn btn-primary"
+            @click="onClosed(true)"
+          >
             {{ proceedButtonLabel }}
           </button>
         </div>
