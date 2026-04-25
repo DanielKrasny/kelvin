@@ -176,4 +176,5 @@ def update_attendance_device(
         raise HttpError(400, "You cannot activate a revoked device.")
     device.state = body.state
     device.save()
+    notify_device_change(request.user, device)
     return attendance_device_to_dto(device)
