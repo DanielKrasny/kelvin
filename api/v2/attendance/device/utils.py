@@ -36,22 +36,25 @@ def get_device(request, device_id: int) -> AttendanceDevice:
 
 
 def get_initial_device_state(user: User) -> AttendanceDevice.DeviceState:
-    if is_teacher(user):
-        return AttendanceDevice.DeviceState.ACTIVE
-
     one_year_ago = timezone.now() - timedelta(days=365)
     agg = AttendanceDevice.objects.filter(user=user).aggregate(
         has_pending=models.Count("pk", filter=models.Q(state=AttendanceDevice.DeviceState.PENDING)),
         has_active=models.Count("pk", filter=models.Q(state=AttendanceDevice.DeviceState.ACTIVE)),
         last_created_at=models.Max("created_at"),
     )
+    has_pending = agg["has_pending"] > 0
+    has_active = agg["has_active"] > 0
+    last_created_at = agg["last_created_at"]
 
-    if agg["has_pending"]:
+    if has_pending:
         raise HttpError(409, "The logged in user already has a pending attendance device.")
 
-    if agg["has_active"] or (
-        agg["last_created_at"] is not None and agg["last_created_at"] >= one_year_ago
-    ):
+    if is_teacher(user):
+        if has_active:
+            raise HttpError(409, "The logged in user already has an active attendance device.")
+        return AttendanceDevice.DeviceState.ACTIVE
+
+    if has_active or (last_created_at is not None and last_created_at >= one_year_ago):
         return AttendanceDevice.DeviceState.PENDING
 
     return AttendanceDevice.DeviceState.ACTIVE
