@@ -32,6 +32,12 @@ class AttendanceDevice(models.Model):
             ),
         ]
 
+    def __str__(self):
+        return f"#{self.pk} {self.user.username} {self.device_name}"
+
+    def notification_str(self):
+        return self.device_name
+
 
 class ClassSession(models.Model):
     clazz = models.ForeignKey(
