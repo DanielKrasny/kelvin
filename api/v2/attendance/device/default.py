@@ -45,7 +45,7 @@ def list_attendance_devices(
 @router.get(
     "/all",
     response={200: List[AttendanceDeviceDTO], 401: ErrorResponse},
-    summary="List all attendance devices for all user",
+    summary="List all attendance devices for all users",
     url_name="list_all_attendance_devices",
     auth=django_auth_superuser,
 )
@@ -64,7 +64,6 @@ def list_all_attendance_devices(
     response={
         200: List[AttendanceDeviceDTO],
         401: ErrorResponse,
-        403: ErrorResponse,
         404: ErrorResponse,
     },
     summary="List all attendance devices for a specific user",
