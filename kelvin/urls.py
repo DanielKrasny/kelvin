@@ -24,6 +24,7 @@ from common.utils import is_teacher
 from ninja import NinjaAPI
 from api.v2.default import router as api_default_router
 from api.v2.api import router as api_router
+from api.v2.attendance import router as attendance_router
 from api.v2.llm import router as llm_router
 from api.v2.task import router as task_router
 
@@ -35,6 +36,7 @@ api_v2 = NinjaAPI(
 )
 api_v2.add_router("", api_default_router)
 api_v2.add_router("api", api_router)
+api_v2.add_router("attendance", attendance_router)
 api_v2.add_router("llm", llm_router)
 api_v2.add_router("task", task_router)
 
