@@ -40,9 +40,7 @@ class AttendanceDevice(models.Model):
 
 
 class ClassSession(models.Model):
-    clazz = models.ForeignKey(
-        Class, on_delete=models.CASCADE, name="Class", related_name="sessions"
-    )
+    clazz = models.ForeignKey(Class, on_delete=models.CASCADE, related_name="sessions")
     start = models.DateTimeField()
     end = models.DateTimeField()
     created_at = models.DateTimeField(auto_now_add=True)
