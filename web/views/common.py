@@ -35,6 +35,16 @@ def api_token(request):
     return render(request, "web/common/api_token.html", {})
 
 
+@login_required()
+def attendance_devices(request):
+    return render(request, "web/attendance/devices.html", {})
+
+
+@user_passes_test(lambda u: u.is_superuser)
+def attendance_devices_admin(request):
+    return render(request, "web/attendance/admin/devices.html", {})
+
+
 def template_context(request):
     return {
         "is_teacher": is_teacher(request.user),
