@@ -222,9 +222,7 @@ def create_attendance_records_teacher(
     ensure_api_token(request)
 
     data = process_encrypted_attendance_message(
-        user=request.user,
-        body=body,
-        schema_class=CreateAttendanceRecordsTeacherInnerSchema
+        user=request.user, body=body, schema_class=CreateAttendanceRecordsTeacherInnerSchema
     )
 
     session = get_session_and_ensure_access(request, data.class_session_id)
