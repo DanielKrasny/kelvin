@@ -5,10 +5,10 @@ from django.contrib.auth.models import User
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.crypto import get_random_string
+from django.conf import settings
 from ninja import Router
 from ninja.errors import HttpError
 from ninja.security import django_auth
-from kelvin.settings import ATTENDANCE_PUBLIC_KEY_PATH
 from api.v2.dto import ErrorResponse
 from api.v2.security import is_teacher_auth
 from attendance.models import ClassSession, AttendanceToken, Attendance
@@ -46,7 +46,7 @@ def ensure_api_token(request):
 )
 def get_server_public_key(request) -> AttendancePublicKeyDTO:
     try:
-        with open(ATTENDANCE_PUBLIC_KEY_PATH, "r") as f:
+        with open(settings.ATTENDANCE_PUBLIC_KEY_PATH, "r") as f:
             public_key = f.read()
             return AttendancePublicKeyDTO(public_key=public_key)
     except FileNotFoundError:

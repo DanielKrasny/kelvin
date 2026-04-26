@@ -8,7 +8,7 @@ from django.shortcuts import get_object_or_404
 from ninja import Schema
 from ninja.errors import HttpError
 from pydantic import ValidationError
-from kelvin.settings import ATTENDANCE_PRIVATE_KEY_PATH
+from django.conf import settings
 from .device.utils import get_active_device
 from .dto import (
     EncryptedMessageInnerSchema,
@@ -29,7 +29,7 @@ def validate_json_schema(schema_class: Type[SchemaType], data: str) -> SchemaTyp
 
 def decrypt_attendance_message(message: EncryptedMessageSchema) -> EncryptedMessageInnerSchema:
     try:
-        with open(ATTENDANCE_PRIVATE_KEY_PATH, "rb") as f:
+        with open(settings.ATTENDANCE_PRIVATE_KEY_PATH, "rb") as f:
             private_key = serialization.load_pem_private_key(f.read(), password=None)
         if not isinstance(private_key, rsa.RSAPrivateKey):
             raise Exception()

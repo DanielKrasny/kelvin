@@ -1,4 +1,7 @@
 import json
+import base64
+import os
+import tempfile
 from base64 import b64encode
 from datetime import date, datetime, time, timedelta
 from unittest.mock import patch
@@ -6,10 +9,22 @@ from unittest.mock import patch
 from django.contrib.auth.models import Group, User
 from django.contrib.contenttypes.models import ContentType
 from django.utils import timezone
-from django.test import Client, TestCase
+from django.test import Client, TestCase, override_settings
 from notifications.models import Notification
 
-from attendance.models import Attendance, AttendanceDevice, ClassSession
+from cryptography.hazmat.primitives import serialization, hashes
+from cryptography.hazmat.primitives.asymmetric import padding, rsa
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.hazmat.primitives.serialization import (
+    Encoding,
+    PublicFormat,
+    NoEncryption,
+    PrivateFormat,
+)
+
+from api.models import UserToken
+from api.backends import hash_token
+from attendance.models import Attendance, AttendanceDevice, AttendanceToken, ClassSession
 from common.models import Class, Semester, Subject
 
 
@@ -815,3 +830,257 @@ class ClassSessionAPITestCase(TestCase):
         session2_data = payload[str(session2.id)]
         student_presence2 = next(s for s in session2_data if s["id"] == self.student.id)
         self.assertFalse(student_presence2["is_present"])
+
+
+_temp_dir = tempfile.mkdtemp()
+_priv_path = os.path.join(_temp_dir, "priv.pem")
+_pub_path = os.path.join(_temp_dir, "pub.pem")
+
+_server_private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+_server_public_key = _server_private_key.public_key()
+with open(_priv_path, "wb") as f:
+    f.write(
+        _server_private_key.private_bytes(
+            Encoding.PEM, PrivateFormat.TraditionalOpenSSL, NoEncryption()
+        )
+    )
+with open(_pub_path, "wb") as f:
+    f.write(_server_public_key.public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo))
+
+
+@override_settings(ATTENDANCE_PRIVATE_KEY_PATH=_priv_path, ATTENDANCE_PUBLIC_KEY_PATH=_pub_path)
+class AttendanceAPITestCase(TestCase):
+    @classmethod
+    def tearDownClass(cls):
+        import shutil
+
+        shutil.rmtree(_temp_dir)
+        super().tearDownClass()
+
+    def setUp(self):
+        self.client = Client()
+        self.teacher, self.teacher_token = self.create_api_user("teacher-api")
+        self.student, self.student_token = self.create_api_user("student-api")
+
+        teachers_group, _ = Group.objects.get_or_create(name="teachers")
+        self.teacher.groups.add(teachers_group)
+
+        self.semester = Semester.objects.create(
+            begin=date(2026, 2, 1),
+            end=date(2026, 6, 30),
+            year=2026,
+            winter=False,
+            active=True,
+            inbus_semester_id=1,
+        )
+        self.subject = Subject.objects.create(name="Programming", abbr="PRG")
+        self.clazz = Class.objects.create(
+            code="P/01",
+            teacher=self.teacher,
+            semester=self.semester,
+            subject=self.subject,
+            day=Class.Day.MONDAY,
+            time=time(10, 0),
+        )
+        self.session = ClassSession.objects.create(
+            clazz=self.clazz,
+            start=timezone.now() - timedelta(hours=1),
+            end=timezone.now() + timedelta(hours=1),
+        )
+
+        self.teacher_device, self.teacher_priv_key = self.create_device_with_key(self.teacher)
+        self.student_device, self.student_priv_key = self.create_device_with_key(self.student)
+
+    def create_api_user(self, username):
+        user = User.objects.create_user(username=username, password="pw")
+        token_plaintext = f"token-{username}"
+        UserToken.objects.create(user=user, token=hash_token(token_plaintext))
+        return user, token_plaintext
+
+    def create_device_with_key(self, user):
+        private_key = rsa.generate_private_key(65537, 2048)
+        public_key_pem = (
+            private_key.public_key()
+            .public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo)
+            .decode()
+        )
+        device = AttendanceDevice.objects.create(
+            user=user,
+            device_name="Test Device",
+            public_key=public_key_pem,
+            state=AttendanceDevice.DeviceState.ACTIVE,
+        )
+        return device, private_key
+
+    def get_api_headers(self, token_plaintext):
+        return {"HTTP_AUTHORIZATION": f"Bearer {token_plaintext}"}
+
+    def encrypt_message(self, data_dict, user_private_key, server_public_key):
+        data_json = json.dumps(data_dict, separators=(",", ":"), sort_keys=True)
+        signature = user_private_key.sign(data_json.encode(), padding.PKCS1v15(), hashes.SHA256())
+        inner_payload = {"data": data_json, "signature": base64.b64encode(signature).decode()}
+        inner_json = json.dumps(inner_payload)
+
+        aes_key = AESGCM.generate_key(bit_length=256)
+        aes_gcm = AESGCM(aes_key)
+        iv = os.urandom(12)
+        ciphertext = aes_gcm.encrypt(iv, inner_json.encode(), None)
+
+        encrypted_key = server_public_key.encrypt(
+            aes_key,
+            padding.OAEP(
+                mgf=padding.MGF1(algorithm=hashes.SHA256()), algorithm=hashes.SHA256(), label=None
+            ),
+        )
+
+        return ".".join(
+            [
+                base64.b64encode(encrypted_key).decode(),
+                base64.b64encode(iv).decode(),
+                base64.b64encode(ciphertext).decode(),
+            ]
+        )
+
+    def test_get_server_public_key(self):
+        self.client.force_login(self.student)
+        response = self.client.get("/api/v2/attendance/server-public-key")
+        self.assertEqual(response.status_code, 200)
+        with open(_pub_path, "r") as f:
+            self.assertEqual(response.json()["public_key"], f.read())
+
+    def test_create_attendance_token(self):
+        data = {
+            "user_id": self.teacher.id,
+            "length": 300,
+            "method": "qr",
+            "class_session_id": self.session.id,
+        }
+        encrypted_message = self.encrypt_message(data, self.teacher_priv_key, _server_public_key)
+
+        headers = self.get_api_headers(self.teacher_token)
+        response = self.client.post(
+            "/api/v2/attendance/token",
+            data=json.dumps({"encrypted_message": encrypted_message}),
+            content_type="application/json",
+            **headers,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["class_session_id"], self.session.id)
+        self.assertEqual(payload["method"], "qr")
+        self.assertTrue(AttendanceToken.objects.filter(token=payload["token"]).exists())
+
+    def test_create_attendance_record_student(self):
+        token = AttendanceToken.objects.create(
+            class_session=self.session,
+            token="valid-token",
+            method=AttendanceToken.Method.QR_CODE,
+            expires_at=timezone.now() + timedelta(minutes=5),
+            created_by=self.teacher,
+            created_by_device=self.teacher_device,
+        )
+
+        student_record_time = token.created_at - timedelta(seconds=1)
+
+        data = {
+            "user_id": self.student.id,
+            "class_session_id": self.session.id,
+            "token": "valid-token",
+            "created_at": student_record_time.isoformat().replace("+00:00", "Z"),
+        }
+        encrypted_message = self.encrypt_message(data, self.student_priv_key, _server_public_key)
+
+        headers = self.get_api_headers(self.student_token)
+        response = self.client.post(
+            "/api/v2/attendance/log",
+            data=json.dumps({"encrypted_message": encrypted_message}),
+            content_type="application/json",
+            **headers,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(
+            Attendance.objects.filter(student=self.student, class_session=self.session).exists()
+        )
+
+    def test_create_attendance_records_manual(self):
+        headers = self.get_api_headers(self.teacher_token)
+        student2 = User.objects.create_user(username="student2")
+        self.clazz.students.add(student2)
+
+        response = self.client.post(
+            "/api/v2/attendance/teacher/manual",
+            data=json.dumps(
+                {
+                    "class_session_id": self.session.id,
+                    "records": [
+                        {"student_login": self.student.username, "is_present": True},
+                        {"student_login": student2.username, "is_present": False},
+                    ],
+                }
+            ),
+            content_type="application/json",
+            **headers,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.json()), 2)
+        self.assertTrue(Attendance.objects.filter(student=self.student, is_present=True).exists())
+        self.assertTrue(Attendance.objects.filter(student=student2, is_present=False).exists())
+
+    def test_create_attendance_records_teacher_batch_ble(self):
+        token = AttendanceToken.objects.create(
+            class_session=self.session,
+            token="ble-token",
+            method=AttendanceToken.Method.BLE,
+            expires_at=timezone.now() + timedelta(minutes=5),
+            created_by=self.teacher,
+            created_by_device=self.teacher_device,
+        )
+
+        student_record_time = token.created_at + timedelta(seconds=1)
+
+        student_data = {
+            "user_id": self.student.id,
+            "class_session_id": self.session.id,
+            "token": "ble-token",
+            "created_at": student_record_time.isoformat().replace("+00:00", "Z"),
+        }
+        student_encrypted_msg = self.encrypt_message(
+            student_data, self.student_priv_key, _server_public_key
+        )
+
+        batch_data = {
+            "user_id": self.teacher.id,
+            "class_session_id": self.session.id,
+            "records": [
+                {
+                    "encrypted_message": student_encrypted_msg,
+                    "received_at": (student_record_time + timedelta(seconds=1))
+                    .isoformat()
+                    .replace("+00:00", "Z"),
+                }
+            ],
+        }
+        teacher_encrypted_batch = self.encrypt_message(
+            batch_data, self.teacher_priv_key, _server_public_key
+        )
+
+        headers = self.get_api_headers(self.teacher_token)
+        response = self.client.post(
+            "/api/v2/attendance/teacher/log",
+            data=json.dumps({"encrypted_message": teacher_encrypted_batch}),
+            content_type="application/json",
+            **headers,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(len(payload["success"]), 1)
+        self.assertEqual(len(payload["failed"]), 0)
+        self.assertTrue(
+            Attendance.objects.filter(
+                student=self.student, record_format=Attendance.RecordFormat.AUTOMATIC
+            ).exists()
+        )
