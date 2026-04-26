@@ -1,11 +1,13 @@
 from datetime import datetime
 from typing import List, Optional, cast
 
-from django.db import transaction
+from django.db import transaction, models
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from ninja import Body, Path, Router
 from ninja.errors import HttpError
 from ninja.pagination import paginate
+from ninja.security import django_auth
 
 from api.v2.security import is_teacher_auth
 from api.v2.dto import ErrorResponse
@@ -29,7 +31,9 @@ def get_class(class_id: int) -> Class:
 
 
 def get_session(session_id: int) -> ClassSession:
-    return get_object_or_404(ClassSession.objects.select_related("clazz"), pk=session_id)
+    return get_object_or_404(
+        ClassSession.objects.select_related("clazz", "clazz__teacher"), pk=session_id
+    )
 
 
 def ensure_class_write_access(request, clazz: Class) -> None:
@@ -57,6 +61,31 @@ def validate_session_times(
 
 
 @router.get(
+    "/upcoming",
+    response={
+        200: List[ClassSessionDTO],
+        401: ErrorResponse,
+    },
+    summary="List upcoming class sessions for the current user",
+    url_name="list_upcoming_class_sessions",
+    auth=django_auth,
+)
+@paginate
+def list_upcoming_class_sessions(request) -> List[ClassSessionDTO]:
+    now = timezone.now()
+    sessions = (
+        ClassSession.objects.filter(
+            models.Q(clazz__teacher=request.user) | models.Q(clazz__students=request.user),
+            end__gt=now,
+        )
+        .select_related("clazz", "clazz__teacher")
+        .distinct()
+        .order_by("end", "id")
+    )
+    return [class_session_to_dto(session) for session in sessions]
+
+
+@router.get(
     "/class/{class_id}",
     response={
         200: List[ClassSessionDTO],
@@ -74,7 +103,9 @@ def list_class_sessions(request, class_id: int = Path(...)) -> List[ClassSession
     ensure_class_write_access(request, clazz)
 
     sessions = (
-        ClassSession.objects.select_related("clazz").filter(clazz=clazz).order_by("start", "id")
+        ClassSession.objects.select_related("clazz", "clazz__teacher")
+        .filter(clazz=clazz)
+        .order_by("start", "id")
     )
     return [class_session_to_dto(session) for session in sessions]
 
@@ -143,7 +174,9 @@ def bulk_update_class_sessions(
 
     session_ids = [item.id for item in body.sessions]
     sessions_map = (
-        ClassSession.objects.select_related("clazz").filter(clazz=clazz).in_bulk(session_ids)
+        ClassSession.objects.select_related("clazz", "clazz__teacher")
+        .filter(clazz=clazz)
+        .in_bulk(session_ids)
     )
     missing_ids = sorted(session_id for session_id in session_ids if session_id not in sessions_map)
     if missing_ids:
@@ -182,7 +215,7 @@ def bulk_delete_class_sessions(
 ) -> BulkDeleteClassSessionResultDTO:
     clazz = get_class(class_id)
     ensure_class_write_access(request, clazz)
-    sessions = ClassSession.objects.select_related("clazz").filter(
+    sessions = ClassSession.objects.select_related("clazz", "clazz__teacher").filter(
         clazz=clazz, pk__in=body.session_ids
     )
     session_ids = {session.pk for session in sessions}
