@@ -26,6 +26,13 @@ def list_devices(
     return qs.order_by("-created_at")
 
 
+def get_active_device(user: User) -> AttendanceDevice:
+    device = list_devices(user=user, state={AttendanceDevice.DeviceState.ACTIVE}).first()
+    if not device:
+        raise HttpError(404, "No active attendance device found for this user.")
+    return device
+
+
 def get_device(request, device_id: int) -> AttendanceDevice:
     device = AttendanceDevice.objects.select_related("user").filter(pk=device_id).first()
     if not device:
