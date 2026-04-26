@@ -9,10 +9,8 @@ from ninja import Schema
 from ninja.errors import HttpError
 from pydantic import ValidationError
 from kelvin.settings import ATTENDANCE_PRIVATE_KEY_PATH
-from attendance.models import AttendanceToken, AttendanceDevice
 from .device.utils import get_active_device
 from .dto import (
-    AttendanceTokenDTO,
     EncryptedMessageInnerSchema,
     EncryptedMessageSchema,
     EncryptedMessageDataBaseSchema,
