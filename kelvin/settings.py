@@ -298,6 +298,10 @@ INBUS_CLIENT_SECRET = "placeholder"
 # The default Client ID for new tokens generated from web UI.
 API_TOKENS_DEFAULT_CLIENT_ID = ""
 
+# Paths to RSA key pair in PEM format.
+ATTENDANCE_PRIVATE_KEY_PATH = "./attendance_private.pem"
+ATTENDANCE_PUBLIC_KEY_PATH = "./attendance_public.pem"
+
 try:
     from .local_settings import *  # noqa: F403
 except ModuleNotFoundError:

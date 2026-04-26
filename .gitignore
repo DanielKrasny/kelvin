@@ -122,5 +122,8 @@ static/
 
 kelvin_data/
 
+# Certificate files
+*.pem
+
 # JetBrains InteliJ Idea
 .idea/
