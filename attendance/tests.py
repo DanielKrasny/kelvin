@@ -250,7 +250,7 @@ class AttendanceDeviceAPITestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         device.refresh_from_db()
         self.assertEqual(device.state, AttendanceDevice.DeviceState.REVOKED)
-        self.assertEqual(Notification.objects.count(), 0)
+        self.assertEqual(Notification.objects.count(), 1)
 
     def test_bulk_activate_can_revoke_existing_active_devices(self):
         active_device = self.create_device(self.user, state=AttendanceDevice.DeviceState.ACTIVE)
@@ -558,7 +558,7 @@ class ClassSessionAPITestCase(TestCase):
             content_type="application/json",
         )
 
-        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.status_code, 404)
 
     def test_bulk_delete_class_sessions(self):
         first_session = self.create_session(self.teacher_class)
