@@ -9,7 +9,7 @@ from django.utils import timezone
 from django.test import Client, TestCase
 from notifications.models import Notification
 
-from attendance.models import AttendanceDevice, ClassSession
+from attendance.models import Attendance, AttendanceDevice, ClassSession
 from common.models import Class, Semester, Subject
 
 
@@ -357,13 +357,13 @@ class ClassSessionAPITestCase(TestCase):
         )
 
     def create_session(self, clazz: Class, **kwargs) -> ClassSession:
-        start = timezone.make_aware(datetime(2026, 4, 28, 10, 0))
+        start = kwargs.get("start", timezone.make_aware(datetime(2026, 4, 28, 10, 0)))
+        end = kwargs.get("end", start + timedelta(hours=2))
         data = {
             "clazz": clazz,
             "start": start,
-            "end": start + timedelta(hours=2),
+            "end": end,
         }
-        data.update(kwargs)
         return ClassSession.objects.create(**data)
 
     def test_teacher_can_create_class_session_for_own_class(self):
@@ -637,3 +637,181 @@ class ClassSessionAPITestCase(TestCase):
         self.assertEqual(len(payload["items"]), 1)
         self.assertEqual(payload["items"][0]["id"], session_student.id)
         self.assertEqual(payload["items"][0]["teacher_id"], self.other_teacher.id)
+
+    def test_class_session_presence_aggregation(self):
+        start = timezone.make_aware(datetime(2026, 5, 1, 10, 0))
+        end = start + timedelta(minutes=30)
+        session = self.create_session(self.teacher_class, start=start, end=end)
+
+        student_auto = User.objects.create_user(username="student-auto", last_name="Auto")
+        self.teacher_class.students.add(student_auto)
+        Attendance.objects.create(
+            student=student_auto,
+            class_session=session,
+            attendance_time=start + timedelta(minutes=5),
+            is_present=True,
+            record_format=Attendance.RecordFormat.AUTOMATIC,
+        )
+        Attendance.objects.create(
+            student=student_auto,
+            class_session=session,
+            attendance_time=start + timedelta(minutes=15),
+            is_present=True,
+            record_format=Attendance.RecordFormat.AUTOMATIC,
+        )
+
+        student_teacher = User.objects.create_user(username="student-teacher", last_name="Teacher")
+        self.teacher_class.students.add(student_teacher)
+        Attendance.objects.create(
+            student=student_teacher,
+            class_session=session,
+            attendance_time=start + timedelta(minutes=5),
+            is_present=False,
+            record_format=Attendance.RecordFormat.MANUAL_TEACHER,
+        )
+
+        student_enrolled_absent = User.objects.create_user(
+            username="student-enrolled-absent", last_name="EnrolledAbsent"
+        )
+        self.teacher_class.students.add(student_enrolled_absent)
+
+        student_not_enrolled = User.objects.create_user(
+            username="student-not-enrolled", last_name="NotEnrolled"
+        )
+        Attendance.objects.create(
+            student=student_not_enrolled,
+            class_session=session,
+            attendance_time=start + timedelta(minutes=5),
+            is_present=True,
+            record_format=Attendance.RecordFormat.MANUAL_STUDENT,
+        )
+
+        self.login(self.teacher)
+        response = self.client.get(f"/api/v2/attendance/class-session/{session.id}/presence")
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+
+        self.assertEqual(len(payload), 4)
+
+        self.assertEqual(payload[0]["login"], "student-auto")
+        self.assertTrue(payload[0]["is_present"])
+        self.assertEqual(payload[0]["record_format"], Attendance.RecordFormat.AUTOMATIC)
+
+        self.assertEqual(payload[1]["login"], "student-enrolled-absent")
+        self.assertFalse(payload[1]["is_present"])
+        self.assertIsNone(payload[1]["record_format"])
+
+        self.assertEqual(payload[2]["login"], "student-not-enrolled")
+        self.assertTrue(payload[2]["is_present"])
+        self.assertEqual(payload[2]["record_format"], Attendance.RecordFormat.MANUAL_STUDENT)
+
+        self.assertEqual(payload[3]["login"], "student-teacher")
+        self.assertFalse(payload[3]["is_present"])
+        self.assertEqual(payload[3]["record_format"], Attendance.RecordFormat.MANUAL_TEACHER)
+
+    def test_get_class_session_student_presence(self):
+        session = self.create_session(self.teacher_class)
+        Attendance.objects.create(
+            student=self.student,
+            class_session=session,
+            attendance_time=session.start + timedelta(minutes=5),
+            is_present=True,
+            record_format=Attendance.RecordFormat.AUTOMATIC,
+        )
+
+        self.login(self.teacher)
+        response = self.client.get(
+            f"/api/v2/attendance/class-session/{session.id}/presence/{self.student.id}"
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(len(payload), 1)
+        self.assertEqual(payload[0]["record_format"], Attendance.RecordFormat.AUTOMATIC)
+
+    def test_class_session_timespans(self):
+        start = timezone.make_aware(datetime(2026, 5, 1, 10, 0))
+        end = start + timedelta(minutes=30)
+        session = self.create_session(self.teacher_class, start=start, end=end)
+
+        Attendance.objects.create(
+            student=self.student,
+            class_session=session,
+            attendance_time=start + timedelta(minutes=5),
+            is_present=True,
+            record_format=Attendance.RecordFormat.AUTOMATIC,
+        )
+
+        other_student = User.objects.create_user(username="other-student")
+        self.teacher_class.students.add(other_student)
+        Attendance.objects.create(
+            student=other_student,
+            class_session=session,
+            attendance_time=start + timedelta(minutes=15),
+            is_present=True,
+            record_format=Attendance.RecordFormat.AUTOMATIC,
+        )
+
+        self.login(self.teacher)
+        response = self.client.get(f"/api/v2/attendance/class-session/{session.id}/timespans")
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(len(payload), 3)
+        self.assertEqual(payload[0]["time"], "10:00")
+        self.assertEqual(payload[0]["count"], 1)
+        self.assertEqual(payload[1]["time"], "10:10")
+        self.assertEqual(payload[1]["count"], 1)
+        self.assertEqual(payload[2]["time"], "10:20")
+        self.assertEqual(payload[2]["count"], 0)
+
+        Attendance.objects.create(
+            student=self.superuser,
+            class_session=session,
+            attendance_time=start + timedelta(minutes=5),
+            is_present=True,
+            record_format=Attendance.RecordFormat.MANUAL_TEACHER,
+            created_by=self.teacher,
+        )
+
+        response = self.client.get(
+            f"/api/v2/attendance/class-session/{session.id}/timespans?include_manual=true"
+        )
+        payload = response.json()
+        self.assertEqual(payload[0]["count"], 2)
+        self.assertEqual(payload[1]["count"], 2)
+        self.assertEqual(payload[2]["count"], 1)
+
+    def test_class_presence(self):
+        self.teacher_class.students.add(self.student)
+        session1 = self.create_session(
+            self.teacher_class, start=timezone.make_aware(datetime(2026, 5, 1, 10, 0))
+        )
+        session2 = self.create_session(
+            self.teacher_class, start=timezone.make_aware(datetime(2026, 5, 8, 10, 0))
+        )
+
+        Attendance.objects.create(
+            student=self.student,
+            class_session=session1,
+            attendance_time=session1.start + timedelta(minutes=5),
+            is_present=True,
+            record_format=Attendance.RecordFormat.MANUAL_TEACHER,
+            created_by=self.teacher,
+        )
+
+        self.login(self.teacher)
+        response = self.client.get(
+            f"/api/v2/attendance/class-session/class/{self.teacher_class.id}/presence"
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+
+        self.assertIn(str(session1.id), payload)
+        self.assertIn(str(session2.id), payload)
+
+        session1_data = payload[str(session1.id)]
+        student_presence1 = next(s for s in session1_data if s["id"] == self.student.id)
+        self.assertTrue(student_presence1["is_present"])
+
+        session2_data = payload[str(session2.id)]
+        student_presence2 = next(s for s in session2_data if s["id"] == self.student.id)
+        self.assertFalse(student_presence2["is_present"])
