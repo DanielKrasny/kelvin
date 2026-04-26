@@ -596,3 +596,44 @@ class ClassSessionAPITestCase(TestCase):
         )
 
         self.assertEqual(response.status_code, 422)
+
+    def test_list_upcoming_class_sessions(self):
+        class_teacher = self.create_class(self.teacher, code="T/01")
+        class_student = self.create_class(self.other_teacher, code="S/01")
+        class_student.students.add(self.student)
+        class_unrelated = self.create_class(self.other_teacher, code="U/01")
+
+        now = timezone.now()
+
+        session_teacher = self.create_session(
+            class_teacher, start=now + timedelta(days=1), end=now + timedelta(days=1, hours=2)
+        )
+        session_student = self.create_session(
+            class_student, start=now + timedelta(days=2), end=now + timedelta(days=2, hours=2)
+        )
+
+        self.create_session(
+            class_teacher,
+            start=now - timedelta(days=1, hours=2),
+            end=now - timedelta(days=1),
+        )
+
+        self.create_session(
+            class_unrelated, start=now + timedelta(days=3), end=now + timedelta(days=3, hours=2)
+        )
+
+        self.login(self.teacher)
+        response = self.client.get("/api/v2/attendance/class-session/upcoming")
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(len(payload["items"]), 1)
+        self.assertEqual(payload["items"][0]["id"], session_teacher.id)
+        self.assertEqual(payload["items"][0]["teacher_id"], self.teacher.id)
+
+        self.login(self.student)
+        response = self.client.get("/api/v2/attendance/class-session/upcoming")
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(len(payload["items"]), 1)
+        self.assertEqual(payload["items"][0]["id"], session_student.id)
+        self.assertEqual(payload["items"][0]["teacher_id"], self.other_teacher.id)
