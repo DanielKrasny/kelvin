@@ -37,6 +37,12 @@ def ensure_class_write_access(request, clazz: Class) -> None:
         raise HttpError(403, f"You do not have permission to manage class with ID '{clazz.pk}'.")
 
 
+def get_session_and_ensure_access(request, session_id: int) -> ClassSession:
+    session = get_session(session_id)
+    ensure_class_write_access(request, session.clazz)
+    return session
+
+
 def validate_session_times(
     session: ClassSession, start: Optional[datetime], end: Optional[datetime]
 ) -> None:
