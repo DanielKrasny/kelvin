@@ -36,6 +36,11 @@ def api_token(request):
 
 
 @login_required()
+def api_token_external_client(request, client_id):
+    return render(request, "web/common/api_token_external_client.html", {"client_id": client_id})
+
+
+@login_required()
 def attendance_devices(request):
     return render(request, "web/attendance/devices.html", {})
 

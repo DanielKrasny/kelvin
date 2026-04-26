@@ -8,7 +8,7 @@ import { toastApi } from '../utilities/toast';
 import type { UserToken, CreateUserToken } from './dto';
 import VueModal from '../components/VueModal.vue';
 import TimeAgo from '../components/TimeAgo.vue';
-import PasswordInput from '../components/PasswordInput.vue';
+import TokenCreatedModal from './TokenCreatedModal.vue';
 
 DataTable.use(DataTablesCore);
 
@@ -172,22 +172,11 @@ async function createToken() {
     </div>
   </VueModal>
 
-  <VueModal
+  <TokenCreatedModal
     :open="createModalOpen"
-    title="Token created successfully"
-    cancel-button-label=""
-    proceed-button-label="Close"
+    :token="newToken"
     @closed="() => (createModalOpen = false)"
-  >
-    <div class="alert alert-warning">
-      <i class="bi bi-exclamation-triangle-fill me-2"></i>
-      Make sure to copy the API token now. You won't be able to see it again!
-    </div>
-    <div v-if="newToken">
-      <label class="form-label" for="token">Your token</label>
-      <PasswordInput v-model="newToken.token" name="token" copy-to-clipboard readonly />
-    </div>
-  </VueModal>
+  />
 </template>
 
 <style>

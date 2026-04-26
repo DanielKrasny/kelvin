@@ -2,6 +2,7 @@ export interface ApiClient {
     id: number;
     name: string;
     client_id: string;
+    redirect_uri: string | null;
 }
 
 export interface UserToken {
