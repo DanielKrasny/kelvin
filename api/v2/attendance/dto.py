@@ -73,19 +73,19 @@ class CreateAttendanceTokenInnerSchema(EncryptedMessageDataBaseSchema):
 
 
 class AttendanceTokenDTO(Schema):
-    id: int
-    token: str
-    method: str
-    created_at: datetime
-    expires_at: datetime
-    class_session_id: int
+    id: int = Field(..., description="ID of attendance token")
+    token: str = Field(..., description="Attendance token")
+    method: AttendanceToken.Method = Field(..., description="Method of attendance token")
+    created_at: datetime = Field(..., description="Date of attendance token creation")
+    expires_at: datetime = Field(..., description="Date of attendance token expiration")
+    class_session_id: int = Field(..., description="ID of the class session this token is for")
 
 
 def attendance_token_to_dto(token: AttendanceToken) -> AttendanceTokenDTO:
     return AttendanceTokenDTO(
         id=token.pk,
         token=token.token,
-        method=token.method,
+        method=AttendanceToken.Method(token.method),
         created_at=token.created_at,
         expires_at=token.expires_at,
         class_session_id=token.class_session_id,
