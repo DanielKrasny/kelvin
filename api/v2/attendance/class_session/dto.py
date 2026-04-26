@@ -1,8 +1,8 @@
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 from ninja import Schema
 from pydantic import Field
-from attendance.models import ClassSession
+from attendance.models import ClassSession, Attendance
 from common.models import Class
 
 
@@ -21,6 +21,22 @@ class ClassSessionDTO(Schema):
 
 class BulkDeleteClassSessionResultDTO(Schema):
     deleted_ids: List[int] = Field(..., description="IDs of deleted class sessions")
+
+
+class StudentPresenceDTO(Schema):
+    id: int = Field(..., description="ID of the student")
+    login: str = Field(..., description="Username/Login of the student")
+    first_name: str = Field(..., description="First name of the student")
+    last_name: str = Field(..., description="Last name of the student")
+    is_present: bool = Field(..., description="Whether the student is marked as present")
+    record_format: Optional[Attendance.RecordFormat] = Field(
+        None, description="The format of the attendance record that decided the presence"
+    )
+
+
+class SessionTimespanDTO(Schema):
+    time: str = Field(..., description="Time of the timespan (HH:MM)")
+    count: int = Field(..., description="Count of present students in the timespan")
 
 
 def class_session_to_dto(session: ClassSession) -> ClassSessionDTO:
