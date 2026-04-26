@@ -34,7 +34,7 @@ def get_session(session_id: int) -> ClassSession:
 
 def ensure_class_write_access(request, clazz: Class) -> None:
     if clazz.teacher.pk != request.user.pk:
-        raise HttpError(403, f"You do not have permission to manage class with ID '{clazz.id}'.")
+        raise HttpError(403, f"You do not have permission to manage class with ID '{clazz.pk}'.")
 
 
 def validate_session_times(
@@ -136,18 +136,16 @@ def bulk_update_class_sessions(
     ensure_class_write_access(request, clazz)
 
     session_ids = [item.id for item in body.sessions]
-    sessions_map = ClassSession.objects.select_related("clazz").in_bulk(session_ids)
+    sessions_map = (
+        ClassSession.objects.select_related("clazz").filter(clazz=clazz).in_bulk(session_ids)
+    )
+    missing_ids = sorted(session_id for session_id in session_ids if session_id not in sessions_map)
+    if missing_ids:
+        raise HttpError(404, f"Class sessions with IDs {missing_ids} not found.")
 
     updated_sessions = []
     for item in body.sessions:
-        session = sessions_map.get(item.id)
-        if not session:
-            raise HttpError(404, f"Class session with ID '{item.id}' not found.")
-        if session.clazz.pk != class_id:
-            raise HttpError(
-                400, f"Class session with ID '{item.id}' does not belong to class '{class_id}'."
-            )
-
+        session = sessions_map[item.id]
         validate_session_times(session, item.start, item.end)
 
         if item.start is not None:
@@ -181,7 +179,7 @@ def bulk_delete_class_sessions(
     sessions = ClassSession.objects.select_related("clazz").filter(
         clazz=clazz, pk__in=body.session_ids
     )
-    session_ids = {session.id for session in sessions}
+    session_ids = {session.pk for session in sessions}
     missing_ids = sorted(
         session_id for session_id in body.session_ids if session_id not in session_ids
     )
