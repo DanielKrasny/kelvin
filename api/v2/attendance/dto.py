@@ -1,6 +1,6 @@
 import base64
 from datetime import datetime
-from typing import List, Dict
+from typing import List, Dict, Optional
 from ninja import Schema
 from pydantic import Field, model_validator, PrivateAttr
 from attendance.models import AttendanceToken, Attendance
@@ -124,10 +124,11 @@ class AttendanceRecordDTO(Schema):
         ..., description="Whether the student was marked as present in the class session"
     )
     record_format: Attendance.RecordFormat = Field(..., description="Attendance record format")
+    description: Optional[str] = Field(None, description="Optional attendance record description")
     created_at: datetime = Field(..., description="Date of attendance record creation")
     updated_at: datetime = Field(..., description="Date of attendance record last update")
-    created_by_login: str = Field(
-        ..., description="Login of user who created this attendance record"
+    created_by_login: Optional[str] = Field(
+        None, description="Login of user who created this attendance record"
     )
 
 
@@ -155,7 +156,8 @@ def attendance_record_to_dto(record: Attendance) -> AttendanceRecordDTO:
         attendance_time=record.attendance_time,
         is_present=record.is_present,
         record_format=Attendance.RecordFormat(record.record_format),
+        description=record.description,
         created_at=record.created_at,
         updated_at=record.updated_at,
-        created_by_login=record.created_by.username,
+        created_by_login=record.created_by.username if record.created_by else None,
     )
