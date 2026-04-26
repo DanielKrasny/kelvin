@@ -164,7 +164,9 @@ urlpatterns = [
     path("student/<str:login>", teacher_view.student_page, name="student_page"),
     path("reevaluate/<int:submit_id>", teacher_view.reevaluate, name="reevaluate"),
     path("api_token", common_view.api_token, name="api_token"),
-    path("api_token/<str:client_id>", common_view.api_token_external_client, name="simple_api_token"),
+    path(
+        "api_token/<str:client_id>", common_view.api_token_external_client, name="simple_api_token"
+    ),
     path("attendance/devices", common_view.attendance_devices, name="attendance_devices"),
     path(
         "attendance/admin/devices",
