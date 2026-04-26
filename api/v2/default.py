@@ -1,10 +1,32 @@
 from ninja import Router
 
-from common.models import Semester
-from .dto import SemesterResponse, HealthCheckResponse, ErrorResponse
+from common.models import Semester, Class, Room
+from django.shortcuts import get_object_or_404
+from .dto import SemesterResponse, HealthCheckResponse, ErrorResponse, ClassResponse
 from .security import is_teacher_auth
 
 router = Router()
+
+
+@router.get(
+    "/class/{class_id}",
+    response={200: ClassResponse, 401: ErrorResponse, 403: ErrorResponse, 404: ErrorResponse},
+    summary="Get class detail",
+    auth=is_teacher_auth,
+)
+def get_class(request, class_id: int):
+    clazz = get_object_or_404(
+        Class.objects.select_related("teacher", "subject", "room"), pk=class_id
+    )
+    return ClassResponse(
+        id=clazz.pk,
+        teacher_username=clazz.teacher.username,
+        timeslot=clazz.timeslot,
+        time=clazz.time.strftime("%H:%M"),
+        code=clazz.code,
+        subject_abbr=clazz.subject.abbr,
+        room=clazz.room.code if clazz.room else None,
+    )
 
 
 @router.get(
