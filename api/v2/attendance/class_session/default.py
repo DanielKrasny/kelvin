@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Optional, cast
+from typing import List, Optional, cast, Dict
 
 from django.db import transaction, models
 from django.shortcuts import get_object_or_404
@@ -11,10 +11,16 @@ from ninja.security import django_auth
 
 from api.v2.security import is_teacher_auth
 from api.v2.dto import ErrorResponse
+from api.v2.attendance.dto import AttendanceRecordDTO, attendance_record_to_dto
 from attendance.models import ClassSession
 from common.models import Class
-
-from .dto import BulkDeleteClassSessionResultDTO, ClassSessionDTO, class_session_to_dto
+from .dto import (
+    BulkDeleteClassSessionResultDTO,
+    ClassSessionDTO,
+    SessionTimespanDTO,
+    StudentPresenceDTO,
+    class_session_to_dto,
+)
 from .schema import (
     BulkCreateClassSessionSchema,
     BulkDeleteClassSessionSchema,
@@ -22,6 +28,8 @@ from .schema import (
     CreateClassSessionSchema,
     UpdateClassSessionSchema,
 )
+from .utils import calculate_aggregated_presence, calculate_session_timespans
+
 
 router = Router()
 
@@ -282,3 +290,78 @@ def delete_class_session(request, session_id: int = Path(...)) -> bool:
     ensure_class_write_access(request, session.clazz)
     session.delete()
     return True
+
+
+@router.get(
+    "/class/{class_id}/presence",
+    response={
+        200: Dict[int, List[StudentPresenceDTO]],
+        401: ErrorResponse,
+        403: ErrorResponse,
+        404: ErrorResponse,
+    },
+    summary="Get aggregated presence for an entire class",
+    url_name="get_class_presence",
+    auth=is_teacher_auth,
+)
+def get_class_presence(request, class_id: int = Path(...)) -> Dict[int, List[StudentPresenceDTO]]:
+    clazz = get_class(class_id)
+    ensure_class_write_access(request, clazz)
+    sessions = clazz.sessions.order_by("start")
+    return {int(session.pk): calculate_aggregated_presence(session) for session in sessions}
+
+
+@router.get(
+    "/{session_id}/presence",
+    response={
+        200: List[StudentPresenceDTO],
+        401: ErrorResponse,
+        403: ErrorResponse,
+        404: ErrorResponse,
+    },
+    summary="Get aggregated presence for a class session",
+    url_name="get_class_session_presence",
+    auth=is_teacher_auth,
+)
+def get_class_session_presence(request, session_id: int = Path(...)) -> List[StudentPresenceDTO]:
+    session = get_session_and_ensure_access(request, session_id)
+    return calculate_aggregated_presence(session)
+
+
+@router.get(
+    "/{session_id}/timespans",
+    response={
+        200: List[SessionTimespanDTO],
+        401: ErrorResponse,
+        403: ErrorResponse,
+        404: ErrorResponse,
+    },
+    summary="Get timespan aggregation for a class session",
+    url_name="get_class_session_timespans",
+    auth=is_teacher_auth,
+)
+def get_class_session_timespans(
+    request, session_id: int = Path(...), include_manual: bool = False
+) -> List[SessionTimespanDTO]:
+    session = get_session_and_ensure_access(request, session_id)
+    return calculate_session_timespans(session, include_manual)
+
+
+@router.get(
+    "/{session_id}/presence/{student_id}",
+    response={
+        200: List[AttendanceRecordDTO],
+        401: ErrorResponse,
+        403: ErrorResponse,
+        404: ErrorResponse,
+    },
+    summary="Get detailed attendance records for a student in a class session",
+    url_name="get_class_session_student_presence",
+    auth=is_teacher_auth,
+)
+def get_class_session_student_presence(
+    request, session_id: int = Path(...), student_id: int = Path(...)
+) -> List[AttendanceRecordDTO]:
+    session = get_session_and_ensure_access(request, session_id)
+    records = session.attendance_records.filter(student_id=student_id).order_by("-attendance_time")
+    return [attendance_record_to_dto(r) for r in records]
