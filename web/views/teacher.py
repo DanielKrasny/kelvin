@@ -322,6 +322,15 @@ def student_transfer(request: HttpRequest) -> HttpResponse:
 
 
 @user_passes_test(is_teacher)
+def class_sessions(request: HttpRequest, class_id: int) -> HttpResponse:
+    """
+    Page that renders a Vue component to manage class sessions for a specific class.
+    """
+    clazz = get_object_or_404(Class, pk=class_id)
+    return render(request, "web/teacher/class_sessions.html", {"class": clazz})
+
+
+@user_passes_test(is_teacher)
 def reevaluate(request: HttpRequest, submit_id: int) -> HttpResponseRedirect:
     submit = Submit.objects.get(pk=submit_id)
     try:

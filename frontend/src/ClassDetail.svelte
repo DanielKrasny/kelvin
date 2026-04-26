@@ -146,6 +146,9 @@ let showSummary = false;
         title="Add user to class">
         <span class="iconify" data-icon="ant-design:user-add-outlined"></span>
       </button>
+      <a href="/class/{clazz.id}/sessions" title="Manage class sessions">
+        <span class="iconify" data-icon="bx:bx-calendar-event"></span>
+      </a>
       <a href={clazz.csv_link} title="Download CSV with results for all task">
         <span class="iconify" data-icon="la:file-csv-solid"></span>
       </a>
