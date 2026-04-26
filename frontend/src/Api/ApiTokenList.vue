@@ -117,13 +117,7 @@ async function handleDeleteModalClosed(proceed: boolean) {
 }
 
 async function createToken() {
-  const data = await getDataWithCSRF<CreateUserToken>(
-    '/api/v2/api/token/',
-    'POST',
-    {},
-    {},
-    true
-  );
+  const data = await getDataWithCSRF<CreateUserToken>('/api/v2/api/token/', 'POST', {}, {}, true);
   if (data) {
     newToken.value = data;
     createModalOpen.value = true;

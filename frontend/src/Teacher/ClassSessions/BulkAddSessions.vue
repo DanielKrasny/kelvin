@@ -54,7 +54,7 @@ onMounted(() => {
       defaultDate: startTime
     });
     // Set default end time to +90 minutes
-    setEndTime(90)
+    setEndTime(90);
   }
 });
 
