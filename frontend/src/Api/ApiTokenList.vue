@@ -124,6 +124,11 @@ async function createToken() {
     table.ajax.reload();
   }
 }
+
+function handleCreateModalClosed() {
+  createModalOpen.value = false;
+  newToken.value = null;
+}
 </script>
 
 <template>
@@ -172,11 +177,7 @@ async function createToken() {
     </div>
   </VueModal>
 
-  <TokenCreatedModal
-    :open="createModalOpen"
-    :token="newToken"
-    @closed="() => (createModalOpen = false)"
-  />
+  <TokenCreatedModal :open="createModalOpen" :token="newToken" @closed="handleCreateModalClosed" />
 </template>
 
 <style>

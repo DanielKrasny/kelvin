@@ -2,7 +2,7 @@
 import VueModal from '../components/VueModal.vue';
 import PasswordInput from '../components/PasswordInput.vue';
 import type { CreateUserToken } from './dto';
-import { ref } from 'vue';
+import { computed } from 'vue';
 
 const props = defineProps<{
   open: boolean;
@@ -13,7 +13,7 @@ defineEmits<{
   (e: 'closed'): void;
 }>();
 
-const token = ref(props.token?.token);
+const token = computed(() => props.token?.token ?? '');
 </script>
 
 <template>
