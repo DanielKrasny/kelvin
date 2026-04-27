@@ -161,6 +161,7 @@ urlpatterns = [
     path("students", teacher_view.student_list, name="students"),
     path("student/transfer", teacher_view.student_transfer, name="student_transfer"),
     path("class/<int:class_id>/sessions", teacher_view.class_sessions, name="class_sessions"),
+    path("class/<int:class_id>/attendance", teacher_view.class_attendance, name="class_attendance"),
     path("student/<str:login>", teacher_view.student_page, name="student_page"),
     path("reevaluate/<int:submit_id>", teacher_view.reevaluate, name="reevaluate"),
     path("api_token", common_view.api_token, name="api_token"),

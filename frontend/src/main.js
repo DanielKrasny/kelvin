@@ -169,6 +169,7 @@ import ApiUsage from './Api/ApiUsage.vue';
 import AttendanceDeviceList from './Attendance/AttendanceDeviceList.vue';
 import AttendanceDeviceAdminList from './Attendance/AttendanceDeviceAdminList.vue';
 import ClassSessions from './Teacher/ClassSessions/ClassSessions.vue';
+import ClassAttendance from './Teacher/ClassAttendance/ClassAttendance.vue';
 
 const router = createRouter({
     history: createWebHistory(),
@@ -246,6 +247,7 @@ registerVueComponent('api-usage', ApiUsage);
 registerVueComponent('attendance-device-list', AttendanceDeviceList);
 registerVueComponent('attendance-device-admin-list', AttendanceDeviceAdminList);
 registerVueComponent('class-sessions', ClassSessions);
+registerVueComponent('class-attendance', ClassAttendance);
 if (enableNewUI) registerVueComponent('color-theme', ColorThemeNew);
 
 // TODO: Remove when all Svelte is converted. This will then not needed as custom components.
