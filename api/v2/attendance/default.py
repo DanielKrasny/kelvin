@@ -131,10 +131,11 @@ def create_attendance_record(request, body: EncryptedMessageSchema) -> Attendanc
     session = get_object_or_404(
         ClassSession.objects.select_related("clazz"), pk=data.class_session_id
     )
+    now = timezone.now()
     token = session.attendance_tokens.filter(
         token=data.token.strip(),
-        created_at__gt=data.created_at,
-        expires_at__gt=timezone.now(),
+        created_at__lte=now, # Time from external devices is not always precise
+        expires_at__gt=now,
         method=AttendanceToken.Method.QR_CODE,
     )
 
