@@ -4,6 +4,12 @@ export enum DeviceState {
     REVOKED = 'revoked'
 }
 
+export enum AttendanceRecordFormat {
+    AUTOMATIC = 'automatic',
+    MANUAL_STUDENT = 'manual_student',
+    MANUAL_TEACHER = 'manual_teacher'
+}
+
 export interface AttendanceDevice {
     id: number;
     user_login: string;

@@ -149,6 +149,9 @@ let showSummary = false;
       <a href="/class/{clazz.id}/sessions" title="Manage class sessions">
         <span class="iconify" data-icon="bx:bx-calendar-event"></span>
       </a>
+      <a href="/class/{clazz.id}/attendance" title="Show class attendance">
+        <span class="iconify" data-icon="bx:bx-user-check"></span>
+      </a>
       <a href={clazz.csv_link} title="Download CSV with results for all task">
         <span class="iconify" data-icon="la:file-csv-solid"></span>
       </a>
