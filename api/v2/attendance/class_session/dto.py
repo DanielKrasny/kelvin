@@ -9,6 +9,7 @@ from common.models import Class
 class ClassSessionDTO(Schema):
     id: int = Field(..., description="ID of the class session")
     class_id: int = Field(..., description="ID of the related class")
+    class_subject: str = Field(..., description="Subject abbreviation of the related class")
     class_code: str = Field(..., description="Code of the related class")
     class_day: Class.Day = Field(..., description="Day of the related class (e.g., PO, UT, ...)")
     class_time: str = Field(..., description="Time of the related class (HH:MM)")
@@ -43,6 +44,7 @@ def class_session_to_dto(session: ClassSession) -> ClassSessionDTO:
     return ClassSessionDTO(
         id=session.id,
         class_id=session.clazz.pk,
+        class_subject=session.clazz.subject.abbr,
         class_code=session.clazz.code,
         class_day=session.clazz.day,
         class_time=session.clazz.time.strftime("%H:%M"),
