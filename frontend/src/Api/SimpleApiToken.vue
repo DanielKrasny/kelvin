@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 import { ref, onMounted } from 'vue';
-import { getDataWithCSRF, csrfToken } from '../utilities/api';
+import { getDataWithCSRF } from '../utilities/api';
 import type { ApiClient, CreateUserToken } from './dto';
 import SyncLoader from '../components/SyncLoader.vue';
 import TokenCreatedModal from './TokenCreatedModal.vue';
@@ -28,22 +28,20 @@ onMounted(async () => {
 async function handleAccept() {
   creating.value = true;
   try {
-    const response = await fetch('/api/v2/api/token/', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRFToken': csrfToken()
-      },
-      body: JSON.stringify({ client_id: props.clientId })
-    });
+    const data = await getDataWithCSRF<CreateUserToken>(
+      '/api/v2/api/token/',
+      'POST',
+      { client_id: props.clientId },
+      {},
+      true
+    );
 
-    if (response.redirected) {
-      window.location.href = response.url;
-      return;
-    }
-
-    if (response.ok) {
-      newToken.value = await response.json();
+    if (data) {
+      if (data.redirect_url) {
+        window.location.href = data.redirect_url;
+        return;
+      }
+      newToken.value = data;
       createModalOpen.value = true;
     } else {
       creating.value = false;
