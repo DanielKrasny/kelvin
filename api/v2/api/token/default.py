@@ -1,9 +1,6 @@
 from typing import List
 from urllib.parse import urlparse
-
-# from django.contrib.auth import logout
 from django.core.exceptions import ValidationError
-from django.http import HttpResponseRedirect, Http404
 from django.utils.crypto import get_random_string
 from ninja import Router
 from ninja.errors import AuthorizationError, HttpError
@@ -15,17 +12,6 @@ from api.models import ApiClient, UserToken
 from api.v2.dto import ErrorResponse
 from .dto import UserTokenDTO, CreateUserTokenDTO
 from .schema import CreateUserTokenSchema
-
-
-class UnsafeHttpResponseRedirect(HttpResponseRedirect):
-    """
-    An HTTP response that redirects to a given URL without validating the URL's scheme.
-    """
-
-    def __init__(self, redirect_to, *args, **kwargs):
-        self.allowed_schemes = [urlparse(str(redirect_to)).scheme]
-        super().__init__(redirect_to, *args, **kwargs)
-
 
 router = Router()
 
@@ -61,9 +47,9 @@ def get_api_token(request, token_id: int) -> UserTokenDTO:
 
 @router.post(
     "/",
-    response={200: CreateUserTokenDTO, 302: None, 401: ErrorResponse, 403: ErrorResponse},
+    response={200: CreateUserTokenDTO, 401: ErrorResponse, 403: ErrorResponse},
     summary="Create a new API token for the logged in user",
-    description="The endpoint performs a redirect in case client ID has a redirect URI set.",
+    description="The endpoint returns a redirect URL in case client ID has a redirect URI set.",
     url_name="create_api_token",
     auth=django_auth,
 )
@@ -85,17 +71,16 @@ def create_api_token(request, body: CreateUserTokenSchema) -> CreateUserTokenDTO
     token.client = client
     token.save()
 
+    redirect_url = None
     if token.client is not None and token.client.redirect_uri:
-        redirect_uri = token.client.redirect_uri.format(token_plaintext)
-        # Supposing the user is going into an external application, the session is no longer needed
-        # logout(request)
-        return UnsafeHttpResponseRedirect(redirect_uri)
+        redirect_url = token.client.redirect_uri.format(token_plaintext)
 
     return CreateUserTokenDTO(
         id=token.id,
         token=token_plaintext,
         client=token.client.to_dto() if token.client else None,
         created_at=token.created_at,
+        redirect_url=redirect_url,
     )
 
 

@@ -12,3 +12,4 @@ class UserTokenDTO(Schema):
 
 class CreateUserTokenDTO(UserTokenDTO):
     token: str = Field(..., description="Token of the user token")
+    redirect_url: str | None = Field(None, description="Redirect URL if the client has one")

@@ -13,4 +13,5 @@ export interface UserToken {
 
 export interface CreateUserToken extends UserToken {
     token: string;
+    redirect_url: string | null;
 }
